@@ -1,0 +1,9 @@
+# Para conectar e ler os Joy-Cons/Pro Controller
+pydualsense
+streamlit
+# Para cálculos numéricos e análise de sinal (FFT)
+numpy
+scipy
+
+# Para plotar os gráficos
+matplotlib
