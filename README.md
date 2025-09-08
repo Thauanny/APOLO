@@ -1,11 +1,3 @@
-Com todo o prazer. A escolha do nome "APOLO" é excelente e merece um `README.md` à altura.
-
-Um bom `README` é o cartão de visita do seu projeto. Ele deve explicar o que o projeto faz, para quem ele se destina, como instalá-lo e como usá-lo.
-
-Aqui está uma proposta completa, que pode copiar e colar num ficheiro chamado `README.md` na raiz do seu projeto.
-
------
-
 # APOLO
 
 ### Análise Parkinsoniana por Oscilação de Longa Ocorrência
