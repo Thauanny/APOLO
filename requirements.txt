@@ -7,3 +7,6 @@ scipy
 
 # Para plotar os gráficos
 matplotlib
+
+pandas
+scikit-learn
