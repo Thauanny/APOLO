@@ -6,13 +6,16 @@ from src.analysis.signal_analyzer import SignalAnalyzer
 
 def _extract_features_from_rest_test(test_result: Dict) -> Dict:
     """Extrai features de um teste de tremor de repouso."""
-    sensor_readings = test_result.get('readings', [])
+    # Garante que 'readings' seja sempre um array NumPy
+    sensor_readings = np.array(test_result.get('readings', []))
     sample_rate = test_result.get('sample_rate', 0)
     
-    if not sensor_readings or sample_rate <= 0:
+    # Agora a verificação .size funcionará corretamente
+    if sensor_readings.size == 0 or sample_rate <= 0:
         return {"peak_freq": 0, "tremor_power": 0, "total_power": 0, "tremor_index": 0}
 
     analyzer = SignalAnalyzer()
+    # A função find_tremor_frequency já espera um array NumPy ou lista, então funciona bem
     fft_x, yf, dominant_freq, _ = analyzer.find_tremor_frequency(sensor_readings, sample_rate)
     
     tremor_mask = (fft_x >= 4.0) & (fft_x <= 8.0)
