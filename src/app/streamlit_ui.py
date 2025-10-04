@@ -37,8 +37,7 @@ class StreamlitApp:
         
         self.TESTS = {
             "Repouso na Mão": MovementTest(name="Repouso na Mão", instructions="Segure o controle parado na sua mão, apoiado na perna.", duration_seconds=10),
-            "Teste de Tapping Rápido": MovementTest(name="Teste de Tapping Rápido", instructions="Pressione o botão 'R1' o mais rápido que conseguir.", duration_seconds=10),
-            "Teste de Tremor Simulado": MovementTest(name="Teste de Tremor Simulado", instructions="Tente oscilar a mão num ritmo constante (use um metrónomo a 360bpm).", duration_seconds=10),
+            # "Teste de Tapping Rápido": MovementTest(name="Teste de Tapping Rápido", instructions="Pressione o botão 'R1' o mais rápido que conseguir.", duration_seconds=10),
         }
 
     def _initialize_session_state(self):
