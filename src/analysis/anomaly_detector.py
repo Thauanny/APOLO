@@ -28,6 +28,7 @@ class AnomalyDetector:
     def fit(self, baseline_df: pd.DataFrame):
         """
         Treina o detetor com dados de base para aprender o que é 'normal'.
+        Considera TODOS os clusters (exceto ruído/-1) como normalidade.
         """
         features_df = baseline_df.drop(columns=['label'], errors='ignore')
         self._feature_columns = features_df.columns.tolist()
@@ -35,15 +36,14 @@ class AnomalyDetector:
         scaled_data = self._scaler.fit_transform(features_df)
         labels = self._dbscan.fit_predict(scaled_data)
         
-        # Assume que o maior cluster encontrado é o da "normalidade"
         if len(labels) > 0:
-            counts = np.bincount(labels[labels != -1])
-            if len(counts) > 0:
-                self._normal_cluster_label = np.argmax(counts)
-                # Guarda apenas os pontos que pertencem ao cluster de normalidade
-                self._trained_data = scaled_data[labels == self._normal_cluster_label]
-                print(f"Linha de base treinada. O cluster de 'normalidade' é o {self._normal_cluster_label}.")
-            else: # Caso onde só encontrou ruído
+            valid_labels = labels[labels != -1]
+            if len(valid_labels) > 0:
+                self._trained_data = scaled_data[labels != -1]
+                n_clusters = len(np.unique(valid_labels))
+                n_normal_points = len(valid_labels)
+                print(f"Linha de base treinada. {n_clusters} cluster(s) com {n_normal_points} pontos de 'normalidade'.")
+            else:
                 self._trained_data = np.array([])
                 print("Aviso: Nenhum cluster de normalidade encontrado nos dados de base.")
         else:
@@ -58,16 +58,12 @@ class AnomalyDetector:
             raise RuntimeError("O modelo deve ser treinado com 'fit()' antes de prever.")
         
         if self._trained_data.shape[0] == 0:
-            return True # Se não há 'normalidade', tudo é anómalo
+            return True
 
         features_df = pd.DataFrame([features])[self._feature_columns]
         scaled_point = self._scaler.transform(features_df)
         
-        # Lógica de previsão: verifica se o novo ponto está perto (dentro de 'eps')
-        # de algum ponto do cluster de normalidade aprendido.
         distances = np.linalg.norm(self._trained_data - scaled_point, axis=1)
-        
-        # Se a distância mínima for maior que 'eps', está fora do cluster, é uma anomalia.
         return np.min(distances) > self.eps
 
     def save_model(self, path: str):

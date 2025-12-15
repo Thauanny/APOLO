@@ -11,3 +11,6 @@ matplotlib
 pandas
 scikit-learn
 joblib
+
+# Para redução dimensional e visualização
+umap-learn

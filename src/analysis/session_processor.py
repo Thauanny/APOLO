@@ -6,7 +6,6 @@ Este módulo contém a classe SessionProcessor, responsável por transformar
 dados brutos de uma sessão de movimento em um DataFrame de features.
 """
 import pandas as pd
-import numpy as np
 from src.analysis.signal_analyzer import SignalAnalyzer
 from src.analysis.feature_extractor import _extract_features_from_rest_test
 
@@ -29,7 +28,18 @@ class SessionProcessor:
         all_features = []
         fft_analyzer = SignalAnalyzer()
         
-        signal = raw_df['accel_x'].to_numpy()
+        accel_columns = ['accel_x', 'Accel_X', 'ACCEL_X', 'acceleration_x', 'ax']
+        accel_col = None
+        for col in accel_columns:
+            if col in raw_df.columns:
+                accel_col = col
+                break
+        
+        if accel_col is None:
+            print(f"ERRO: Coluna de aceleração não encontrada. Colunas disponíveis: {list(raw_df.columns)}")
+            return pd.DataFrame()
+        
+        signal = raw_df[accel_col].to_numpy()
         
         if len(signal) < self.window_size_samples:
             print("Aviso: A sessão de dados é mais curta que a janela de análise.")

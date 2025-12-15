@@ -7,7 +7,6 @@
 import streamlit as st
 import time
 import pandas as pd
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -18,7 +17,6 @@ from src.analysis.feature_extractor import extract_features
 from src.utils.plotter import plot_test_results
 from src.analysis.cluster_analyzer import ClusterAnalyzer
 from src.analysis.session_processor import SessionProcessor
-from sklearn.decomposition import PCA
 
 MODEL_PATH = "analyzer_model.joblib"
 
@@ -134,32 +132,115 @@ class StreamlitApp:
             df_display = features_df.copy()
             df_display['cluster'] = predicted_labels
 
-            st.header("Resultados da Clusterização")
-            st.metric("Clusters de 'Normalidade' Encontrados", len(set(predicted_labels) - {-1}))
-            st.metric("Janelas Anómalas Detetadas", list(predicted_labels).count(-1))
+            # st.header("Resultados da Clusterização")
+            # col1, col2 = st.columns(2)
+            # with col1:
+            #     st.metric("Clusters de 'Normalidade' Encontrados", len(set(predicted_labels) - {-1}))
+            # with col2:
+            #     st.metric("Janelas Anómalas Detetadas", list(predicted_labels).count(-1))
 
             if features_df.shape[1] < 2:
-                st.warning("A visualização PCA requer pelo menos 2 features.")
+                st.warning("A visualização requer pelo menos 2 features.")
             else:
-                scaled_features = ClusterAnalyzer._scale_features(features_df)
-                pca = PCA(n_components=2)
-                principal_components = pca.fit_transform(scaled_features)
-                fig_pca, ax_pca = plt.subplots(figsize=(10, 7))
-                for cluster_id in sorted(np.unique(predicted_labels)):
-                    label = 'Anomalia (Ruído)' if cluster_id == -1 else f'Cluster {cluster_id}'
-                    color = 'red' if cluster_id == -1 else f'C{cluster_id}'
-                    marker = 'x' if cluster_id == -1 else 'o'
-                    indices = np.where(predicted_labels == cluster_id)
-                    ax_pca.scatter(principal_components[indices, 0], principal_components[indices, 1],
-                               label=label, c=color, marker=marker, s=100, alpha=0.7)
-                ax_pca.set_title("Visualização dos Clusters da Sessão de Jogo")
-                ax_pca.legend()
-                ax_pca.grid(True)
-                plot_col, _ = st.columns([0.7, 0.3])
-                with plot_col:
+                st.subheader("Visualização dos Clusters DBSCAN")
+                st.info("Comparação de dois métodos de redução dimensional para visualizar os clusters encontrados pelo DBSCAN.")
+                
+                with st.spinner("A aplicar PCA e t-SNE para redução dimensional..."):
+                    reduced_pca = ClusterAnalyzer.reduce_dimensions_pca(features_df, n_components=2)
+                    reduced_tsne = ClusterAnalyzer.reduce_dimensions_tsne(features_df, n_components=2, perplexity=30)
+                
+                col_pca, col_tsne = st.columns(2)
+                
+                with col_pca:
+                    st.markdown("#### 📊 PCA + Clusters DBSCAN")
+                    fig_pca, ax_pca = plt.subplots(figsize=(8, 6))
+                    
+                    for cluster_id in sorted(np.unique(predicted_labels)):
+                        if cluster_id == -1:
+                            label = 'Anomalia (Ruído)'
+                            color = 'red'
+                            marker = 'x'
+                            size = 100
+                        else:
+                            label = f'Cluster {cluster_id}'
+                            color = f'C{cluster_id}'
+                            marker = 'o'
+                            size = 50
+                        
+                        indices = np.where(predicted_labels == cluster_id)
+                        ax_pca.scatter(
+                            reduced_pca[indices, 0], 
+                            reduced_pca[indices, 1],
+                            label=label, 
+                            c=color, 
+                            marker=marker, 
+                            s=size, 
+                            alpha=0.7,
+                            edgecolors='black' if cluster_id == -1 else 'none',
+                            linewidth=1.5 if cluster_id == -1 else 0
+                        )
+                    
+                    ax_pca.set_title("Projeção PCA (Linear)", fontsize=12, fontweight='bold')
+                    ax_pca.set_xlabel("Componente Principal 1", fontsize=10)
+                    ax_pca.set_ylabel("Componente Principal 2", fontsize=10)
+                    ax_pca.legend(loc='best', fontsize=8)
+                    ax_pca.grid(True, alpha=0.3)
                     st.pyplot(fig_pca)
+                    st.caption("**PCA:** Método linear, rápido. Preserva variância global.")
+                
+                with col_tsne:
+                    st.markdown("#### 🔍 t-SNE + Clusters DBSCAN")
+                    fig_tsne, ax_tsne = plt.subplots(figsize=(8, 6))
+                    
+                    for cluster_id in sorted(np.unique(predicted_labels)):
+                        if cluster_id == -1:
+                            label = 'Anomalia (Ruído)'
+                            color = 'red'
+                            marker = 'x'
+                            size = 100
+                        else:
+                            label = f'Cluster {cluster_id}'
+                            color = f'C{cluster_id}'
+                            marker = 'o'
+                            size = 50
+                        
+                        indices = np.where(predicted_labels == cluster_id)
+                        ax_tsne.scatter(
+                            reduced_tsne[indices, 0], 
+                            reduced_tsne[indices, 1],
+                            label=label, 
+                            c=color, 
+                            marker=marker, 
+                            s=size, 
+                            alpha=0.7,
+                            edgecolors='black' if cluster_id == -1 else 'none',
+                            linewidth=1.5 if cluster_id == -1 else 0
+                        )
+                    
+                    ax_tsne.set_title("Projeção t-SNE (Não-Linear)", fontsize=12, fontweight='bold')
+                    ax_tsne.set_xlabel("Dimensão t-SNE 1", fontsize=10)
+                    ax_tsne.set_ylabel("Dimensão t-SNE 2", fontsize=10)
+                    ax_tsne.legend(loc='best', fontsize=8)
+                    ax_tsne.grid(True, alpha=0.3)
+                    st.pyplot(fig_tsne)
+                    st.caption("**t-SNE:** Método não-linear. Melhor separação visual de clusters.")
+                
+                
+                st.subheader("Estatísticas por Cluster")
+                cluster_stats = []
+                for cluster_id in sorted(np.unique(predicted_labels)):
+                    count = list(predicted_labels).count(cluster_id)
+                    percentage = (count / len(predicted_labels)) * 100
+                    cluster_stats.append({
+                        'Cluster': '🚨 Anomalia' if cluster_id == -1 else f'Cluster {cluster_id}',
+                        'Janelas': count,
+                        'Percentagem': f'{percentage:.1f}%'
+                    })
+                
+                st.dataframe(pd.DataFrame(cluster_stats), use_container_width=True)
             
-            st.write("### Tabela de Janelas de Análise com Clusters:", df_display)
+            st.write("### Tabela Completa de Janelas com Clusters:")
+            st.dataframe(df_display, use_container_width=True)
 
     def _render_monitoring_view(self):
         st.title("🕵️‍♂️ Monitorização de Anomalias Motoras")

@@ -8,14 +8,21 @@
 Este módulo contém a classe ClusterAnalyzer, a única responsável por
 aplicar o DBSCAN para análise, treino e deteção de anomalias.
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
+from sklearn.manifold import TSNE
 import joblib
+
+try:
+    import umap
+    HAS_UMAP = True
+except ImportError:
+    HAS_UMAP = False
 
 class ClusterAnalyzer:
     """
@@ -37,6 +44,75 @@ class ClusterAnalyzer:
         return StandardScaler().fit_transform(features_df)
 
     @staticmethod
+    def reduce_dimensions_pca(features_df: pd.DataFrame, n_components: int = 2) -> np.ndarray:
+        """
+        Reduz dimensionalidade usando PCA (rápido, linear).
+        """
+        if features_df.empty or features_df.shape[1] < 2:
+            return None
+        
+        scaled_data = ClusterAnalyzer._scale_features(features_df)
+        n_components = min(n_components, scaled_data.shape[1])
+        pca = PCA(n_components=n_components)
+        return pca.fit_transform(scaled_data)
+
+    @staticmethod
+    def get_pca_variance_explained(features_df: pd.DataFrame) -> tuple:
+        """
+        Retorna a variância explicada por cada componente do PCA.
+        Returns:
+            tuple: (componentes, variância_individual, variância_acumulada)
+        """
+        if features_df.empty or features_df.shape[1] < 2:
+            return None, None, None
+        
+        scaled_data = ClusterAnalyzer._scale_features(features_df)
+        pca = PCA()
+        pca.fit(scaled_data)
+        
+        n_components = len(pca.explained_variance_ratio_)
+        componentes = list(range(1, n_components + 1))
+        variancia_individual = pca.explained_variance_ratio_ * 100
+        variancia_acumulada = np.cumsum(pca.explained_variance_ratio_) * 100
+        
+        return componentes, variancia_individual, variancia_acumulada
+
+    @staticmethod
+    def reduce_dimensions_tsne(features_df: pd.DataFrame, n_components: int = 2, perplexity: int = 30) -> np.ndarray:
+        """
+        Reduz dimensionalidade usando t-SNE (não-linear, interpretável para visualização).
+        Melhor para exploração de clusters mas mais lento.
+        """
+        if features_df.empty or features_df.shape[1] < 2:
+            return None
+        
+        scaled_data = ClusterAnalyzer._scale_features(features_df)
+        # Ajustar perplexity para amostras pequenas
+        n_samples = scaled_data.shape[0]
+        perplexity = min(perplexity, (n_samples - 1) // 3)
+        perplexity = max(5, perplexity)
+        
+        tsne = TSNE(n_components=n_components, perplexity=perplexity, random_state=42)
+        return tsne.fit_transform(scaled_data)
+
+    @staticmethod
+    def reduce_dimensions_umap(features_df: pd.DataFrame, n_components: int = 2, n_neighbors: int = 15) -> Optional[np.ndarray]:
+        """
+        Reduz dimensionalidade usando UMAP (não-linear, rápido, preserva estrutura global).
+        Requer instalação: pip install umap-learn
+        """
+        if not HAS_UMAP:
+            print("Aviso: UMAP não está instalado. Use: pip install umap-learn")
+            return None
+        
+        if features_df.empty or features_df.shape[1] < 2:
+            return None
+        
+        scaled_data = ClusterAnalyzer._scale_features(features_df)
+        reducer = umap.UMAP(n_components=n_components, n_neighbors=n_neighbors, random_state=42, metric='euclidean')
+        return reducer.fit_transform(scaled_data)
+
+    @staticmethod
     def calculate_k_distance_graph(features_df: pd.DataFrame, k: int):
         """
         Calcula as distâncias para o k-ésimo vizinho mais próximo para
@@ -49,7 +125,7 @@ class ClusterAnalyzer:
         
         neighbors = NearestNeighbors(n_neighbors=k)
         neighbors_fit = neighbors.fit(scaled_data)
-        distances, indices = neighbors_fit.kneighbors(scaled_data)
+        distances, _ = neighbors_fit.kneighbors(scaled_data)
         
         sorted_distances = np.sort(distances[:, k-1], axis=0)
         return sorted_distances
@@ -82,6 +158,7 @@ class ClusterAnalyzer:
     def fit(self, baseline_df: pd.DataFrame):
         """
         Treina o ClusterAnalyzer com dados de base para aprender o que é 'normal'.
+        Considera TODOS os clusters (exceto ruído/-1) como normalidade.
         """
         features_df = baseline_df.drop(columns=['label'], errors='ignore')
         self._feature_columns = features_df.columns.tolist()
@@ -90,11 +167,12 @@ class ClusterAnalyzer:
         labels = self._dbscan.fit_predict(scaled_data)
         
         if len(labels) > 0:
-            unique_labels, counts = np.unique(labels[labels != -1], return_counts=True)
-            if len(counts) > 0:
-                self._normal_cluster_label = unique_labels[np.argmax(counts)]
-                self._trained_data = scaled_data[labels == self._normal_cluster_label]
-                print(f"Linha de base treinada. O cluster de 'normalidade' é o {self._normal_cluster_label}.")
+            valid_labels = labels[labels != -1]
+            if len(valid_labels) > 0:
+                self._trained_data = scaled_data[labels != -1]
+                n_clusters = len(np.unique(valid_labels))
+                n_normal_points = len(valid_labels)
+                print(f"Linha de base treinada. {n_clusters} cluster(s) com {n_normal_points} pontos de 'normalidade'.")
             else:
                 self._trained_data = np.array([])
                 print("Aviso: Nenhum cluster de normalidade encontrado.")
@@ -117,16 +195,17 @@ class ClusterAnalyzer:
     def predict_clusters(self, features_df: pd.DataFrame) -> np.ndarray:
         """
         Aplica o conhecimento do modelo treinado a um novo dataset para
-        classificar cada ponto como 'normal' ou 'anomalia', de forma rápida.
+        classificar cada ponto como 'normal' (0) ou 'anomalia' (-1).
         """
-        if self._trained_data is None: raise RuntimeError("O modelo deve ser treinado com 'fit()' antes de prever.")
+        if self._trained_data is None: 
+            raise RuntimeError("O modelo deve ser treinado com 'fit()' antes de prever.")
         scaled_data = self._scaler.transform(features_df)
         labels = np.full(shape=len(scaled_data), fill_value=-1, dtype=int)
         if self._trained_data.shape[0] > 0:
             for i, point in enumerate(scaled_data):
                 distances = np.linalg.norm(self._trained_data - point, axis=1)
                 if np.min(distances) <= self.eps:
-                    labels[i] = self._normal_cluster_label
+                    labels[i] = 0
         return labels
 
     def save_model(self, path: str):
