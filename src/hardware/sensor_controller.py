@@ -18,11 +18,8 @@ class SensorController:
             self.dualsense.init()
             print("Controlador DualSense encontrado e conectado.")
 
-            # Callbacks existentes para os sensores de movimento
             self.dualsense.accelerometer_changed += self._on_accelerometer_update
             self.dualsense.gyro_changed += self._on_gyro_update
-
-            # --- NOVIDADE: Callback para o botão 'cross' (X) ---
             self.dualsense.cross_pressed += self._on_cross_button_press
 
             time.sleep(0.5)
@@ -32,13 +29,11 @@ class SensorController:
             self.close()
             raise ConnectionError(f"Não foi possível encontrar ou inicializar um controle DualSense. Erro: {e}")
 
-    # --- NOVIDADE: Função que é chamada a cada clique no botão X ---
     def _on_cross_button_press(self, state: bool):
         """Callback que é chamado quando o estado do botão X muda."""
-        if state: # Apenas regista quando o botão é pressionado (não quando é solto)
+        if state:
             self.button_press_timestamps.append(time.time())
 
-    # --- NOVIDADE: Métodos para gerir os timestamps dos cliques ---
     def start_tapping_test(self):
         """Limpa a lista de timestamps para iniciar um novo teste de tapping."""
         self.button_press_timestamps = []

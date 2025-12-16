@@ -6,10 +6,10 @@ from src.analysis.signal_analyzer import SignalAnalyzer
 
 def _extract_features_from_rest_test(test_result: Dict) -> Dict:
     """Extrai features de um teste de tremor de repouso."""
-    sensor_readings = test_result.get('readings', [])
+    sensor_readings = np.array(test_result.get('readings', []))
     sample_rate = test_result.get('sample_rate', 0)
     
-    if not sensor_readings or sample_rate <= 0:
+    if sensor_readings.size == 0 or sample_rate <= 0:
         return {"peak_freq": 0, "tremor_power": 0, "total_power": 0, "tremor_index": 0}
 
     analyzer = SignalAnalyzer()
@@ -33,7 +33,6 @@ def _extract_features_from_tapping_test(test_result: Dict) -> Dict:
     if len(press_timestamps) < 2 or duration <= 0:
         return {"tap_count": 0, "tap_freq": 0, "tap_interval_std": 0}
 
-    # Calcula os intervalos entre os cliques
     intervals = np.diff(press_timestamps)
     
     return {
@@ -49,7 +48,6 @@ def extract_features(test_result: Dict) -> Dict:
     test_name = test_result.get('name', '')
     features = {"label": test_result.get('label', 'unknown')}
 
-    # Zera todas as features possíveis para garantir que as colunas existam no dataframe
     features.update({
         "peak_freq": 0, "tremor_power": 0, "total_power": 0, "tremor_index": 0,
         "tap_count": 0, "tap_freq": 0, "tap_interval_std": 0
