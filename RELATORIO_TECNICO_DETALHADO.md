@@ -25,9 +25,11 @@ O APOLO é um sistema de análise de sinais de movimento desenvolvido em Python 
 ### 2.1 Coleta de Dados Brutos
 
 A coleta é realizada através de:
+
+
 - **Dispositivo:** Controle Sony DualSense (PS5) conectado via cabo USB
+
 - **Sensor:** Acelerómetro e Giroscópioxs
-- **Duração:** 10 segundos para cada teste (configurável via  `TEST_DURATION_SEC (config.py)`)
 
 **Arquivo gerado para treino:** `gameplay_session.csv` (~16 MB para 15 minutos de jogo)
 
@@ -35,16 +37,24 @@ A coleta é realizada através de:
 
 #### Estrutura dos dados brutos
 
-```csv
-timestamp,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,R1,L1,DpadUp,DpadDown,DpadLeft,DpadRight,L2_force,R2_force
-1759605324.561212,0,2,-1,-87,7940,1437,0,0,False,False,False,False,False,False
+O arquivo CSV contém os seguintes campos capturados a cada polling (10 ms):
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `timestamp` | float | Unix timestamp com precisão de milissegundos |
+| `accel_x, accel_y, accel_z` | float | Aceleração em 3 eixos (m/s²) |
+| `gyro_x, gyro_y, gyro_z` | float | Velocidade angular em 3 eixos (rad/s) |
+| `R1, L1` | bool | Estado dos triggers analógicos |
+| `DpadUp, DpadDown, DpadLeft, DpadRight` | bool | Estado do D-Pad |
+| `L2_force, R2_force` | float | Força dos triggers L2/R2 |
+
+**Exemplo de linha do CSV:**
+```
+timestamp,accel_x,accel_y,accel_z,gyro_x,gyro_y,gyro_z,R1,L1,...
+1759605324.561212,0,2,-1,-87,7940,1437,0,0,...
 ```
 
-**Colunas:**
-- `timestamp`: Unix timestamp com precisão de milissegundos
-- `accel_x, accel_y, accel_z`: Aceleração em 3 eixos (m/s²)
-- `gyro_x, gyro_y, gyro_z`: Velocidade angular em 3 eixos (rad/s)
-- `R1, L1, DpadUp, ...`: Botões do controle (estados digitais 0/1)
+**Taxa de amostragem:** 100 Hz (1 amostra a cada 10 ms)
 
 ---
 
@@ -125,7 +135,7 @@ DBSCAN(
 
 ![Gráfico K-Distance para Otimização](assets/k-distance.png)
 
-
+O gráfico K-Distance mostra a distribuição de distâncias para o vizinho mais próximo, auxiliando na seleção do `eps`.
 
 ---
 
@@ -135,20 +145,30 @@ DBSCAN(
 
 ![Visualização PCA + t-SNE + Clusters DBSCAN](assets/PCA%20e%20TSNE.png)
 
+Comparação entre dois métodos de redução dimensional para visualizar os clusters encontrados.
+
 ---
 
-## 6. DADOS UTILIZADOS E RESULTADOS
+
+## 6. RESULTADOS
+
+### 6.1 Dataset de Treino
 
 
 ### 6.2 Resultados da Detecção
 
-**Caso 1: Padrão Normal (Baseline)**
+#### Caso 1: Padrão Normal (Baseline)
 
 ![Resultado: Padrão Normal - Sem Anomalia](assets/sem_anomalia.png)
 
-**Caso 2: Anomalia Detectada**
+Padrão de movimento dentro dos limites normais - sem anomalias detectadas.
+
+#### Caso 2: Anomalia Detectada
 
 ![Resultado: Anomalia Detectada - Pico de Tremor](assets/anomalia.png)
+
+Tremor detectado na faixa de frequência característica (4-8 Hz) - anomalia identificada.
+
 
 
 ---
