@@ -7,6 +7,7 @@
 """
 Este módulo contém a classe ClusterAnalyzer, a única responsável por
 aplicar o DBSCAN para análise, treino e deteção de anomalias.
+Implementa padrão Singleton para garantir uma única instância em toda aplicação.
 """
 from typing import Dict, Any, Optional
 import pandas as pd
@@ -17,6 +18,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from sklearn.manifold import TSNE
 import joblib
+from config import DBSCAN_EPS, get_min_samples_for_dimensions
 
 try:
     import umap
@@ -27,16 +29,42 @@ except ImportError:
 class ClusterAnalyzer:
     """
     Encapsula toda a lógica de clusterização e deteção de anomalias com DBSCAN.
+    Implementa padrão Singleton: apenas uma instância em toda a aplicação.
     """
+    
+    _instance = None  # Instância singleton
+    
+    def __new__(cls, *args, **kwargs):
+        """Garante que apenas uma instância seja criada."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
-    def __init__(self, eps: float = 1.5, min_samples: int = 5):
-        self.eps = eps
+    def __init__(self, eps: float = None, min_samples: int = None):
+        """
+        Inicializa o ClusterAnalyzer com parâmetros DBSCAN.
+        Singleton: Se já foi inicializado, esta chamada é ignorada.
+        
+        Args:
+            eps: Raio de vizinhança (default: DBSCAN_EPS de config.py)
+            min_samples: Mínimo de pontos para core-point (default: 2 × num_features)
+        """
+        # Evita reinicialização se já foi feita
+        if self._initialized:
+            return
+        
+        self.eps = eps if eps is not None else DBSCAN_EPS
+        # min_samples será calculado no fit() quando soubermos o num_features
         self.min_samples = min_samples
         self._scaler = StandardScaler()
-        self._dbscan = DBSCAN(eps=self.eps, min_samples=self.min_samples)
+        self._dbscan = None  # Será inicializado no fit()
         self._feature_columns = None
         self._trained_data = None
         self._normal_cluster_label = None
+        self._initialized = True
+        
+        print("[ClusterAnalyzer] Singleton inicializado")
 
     @staticmethod
     def _scale_features(features_df: pd.DataFrame):
@@ -162,6 +190,15 @@ class ClusterAnalyzer:
         """
         features_df = baseline_df.drop(columns=['label'], errors='ignore')
         self._feature_columns = features_df.columns.tolist()
+        
+        # Calcula min_samples dinamicamente se não foi especificado
+        if self.min_samples is None:
+            num_features = features_df.shape[1]
+            self.min_samples = get_min_samples_for_dimensions(num_features)
+            print(f"min_samples calculado automaticamente: {self.min_samples} (2 × {num_features} features)")
+        
+        # Inicializa DBSCAN com os parâmetros
+        self._dbscan = DBSCAN(eps=self.eps, min_samples=self.min_samples)
         
         scaled_data = self._scaler.fit_transform(features_df)
         labels = self._dbscan.fit_predict(scaled_data)

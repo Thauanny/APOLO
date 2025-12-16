@@ -2,20 +2,21 @@
 # ... (cabeçalho)
 
 import pandas as pd
+from config import (
+    DATASET_PATH,
+    MODEL_PATH,
+    DBSCAN_EPS,
+    get_min_samples_for_dimensions
+)
 from src.analysis.cluster_analyzer import ClusterAnalyzer
 from src.analysis.session_processor import SessionProcessor
-
-# --- CONFIGURAÇÃO ---
-LOCAL_DATASET_PATH = "gameplay_session.csv"
-MODEL_PATH = "analyzer_model.joblib"
-EPS_VALUE = 2.0
 
 def main():
     print("--- INICIANDO TREINO OFFLINE COM DATASET LOCAL ---")
     try:
-        df_session = pd.read_csv(LOCAL_DATASET_PATH)
+        df_session = pd.read_csv(DATASET_PATH)
     except FileNotFoundError:
-        print(f"ERRO: Dataset '{LOCAL_DATASET_PATH}' não encontrado.")
+        print(f"ERRO: Dataset '{DATASET_PATH}' não encontrado.")
         return
 
     print("A processar sessão de jogo e a extrair features...")
@@ -29,11 +30,11 @@ def main():
     print(f"Foram extraídas features de {len(df_features)} janelas de análise.")
 
     num_features = df_features.shape[1]
-    min_samples_calculado = 2 * num_features
+    min_samples_calculado = get_min_samples_for_dimensions(num_features)
     
-    print(f"A treinar o modelo com eps={EPS_VALUE} e min_samples={min_samples_calculado}...")
+    print(f"A treinar o modelo com eps={DBSCAN_EPS} e min_samples={min_samples_calculado}...")
     
-    cluster_analyzer = ClusterAnalyzer(eps=EPS_VALUE, min_samples=min_samples_calculado)
+    cluster_analyzer = ClusterAnalyzer(eps=DBSCAN_EPS, min_samples=min_samples_calculado)
     cluster_analyzer.fit(df_features)
 
     cluster_analyzer.save_model(MODEL_PATH)

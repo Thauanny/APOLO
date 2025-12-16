@@ -10,37 +10,25 @@ class SensorController:
     Sony DualSense, incluindo sensores de movimento e botões.
     """
     def __init__(self):
-        self.dualsense = pydualsense()
+        self.dualsense = None
         self._latest_sensor_data: Dict[str, float] = {}
-        self.button_press_timestamps: List[float] = [] # Lista para guardar os cliques
 
-        try:
-            self.dualsense.init()
-            print("Controlador DualSense encontrado e conectado.")
+        ds = pydualsense()
+        ds.init()
+        
+        ds.accelerometer_changed += self._on_accelerometer_update
+        ds.gyro_changed += self._on_gyro_update
 
-            self.dualsense.accelerometer_changed += self._on_accelerometer_update
-            self.dualsense.gyro_changed += self._on_gyro_update
-            self.dualsense.cross_pressed += self._on_cross_button_press
-
-            time.sleep(0.5)
-            if not self._latest_sensor_data:
-                raise ConnectionError("Controlador conectado, mas não foi possível receber dados dos sensores.")
-        except Exception as e:
-            self.close()
-            raise ConnectionError(f"Não foi possível encontrar ou inicializar um controle DualSense. Erro: {e}")
-
-    def _on_cross_button_press(self, state: bool):
-        """Callback que é chamado quando o estado do botão X muda."""
-        if state:
-            self.button_press_timestamps.append(time.time())
-
-    def start_tapping_test(self):
-        """Limpa a lista de timestamps para iniciar um novo teste de tapping."""
-        self.button_press_timestamps = []
-
-    def get_tapping_results(self) -> List[float]:
-        """Retorna a lista de timestamps dos cliques desde o início do teste."""
-        return self.button_press_timestamps
+        time.sleep(0.5)
+        
+        if not self._latest_sensor_data:
+            try:
+                ds.close()
+            except:
+                pass
+            raise ConnectionError("Controlador conectado, mas não recebe dados dos sensores.")
+        
+        self.dualsense = ds
 
     def _on_accelerometer_update(self, x: float, y: float, z: float):
         self._latest_sensor_data['accel_x'] = x
@@ -58,12 +46,9 @@ class SensorController:
         return self._latest_sensor_data.copy()
 
     def close(self):
-        if self.dualsense:
-            self.dualsense.close()
-            print("\nConexão com o controlador fechada.")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        if self.dualsense is not None:
+            try:
+                self.dualsense.close()
+            except:
+                pass
+            self.dualsense = None

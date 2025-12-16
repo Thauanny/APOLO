@@ -268,17 +268,22 @@ class StreamlitApp:
     def _render_connection_controls(self):
         if st.session_state.controller is None:
             if st.button("🔌 Conectar ao Controle"):
-                with st.spinner("Procurando..."):
-                    try:
-                        st.session_state.controller = SensorController()
-                        st.rerun()
-                    except ConnectionError as e:
-                        st.error(f"Falha na conexão: {e}")
+                try:
+                    st.session_state.controller = SensorController()
+                    st.success("✅ Controlador Conectado")
+                except ConnectionError as e:
+                    st.error(f"Falha na conexão: {e}")
+                except Exception as e:
+                    st.error(f"Erro inesperado: {e}")
         else:
             st.success("✅ Controlador Conectado")
             if st.button("🔌 Desconectar"):
-                st.session_state.controller.close()
+                try:
+                    st.session_state.controller.close()
+                except:
+                    pass
                 st.session_state.controller = None
+                time.sleep(0.5)  # Aguarda USB liberar
                 st.rerun()
 
     def _render_monitoring_results(self):
@@ -287,46 +292,58 @@ class StreamlitApp:
         if last_result is None:
             st.info("Aguardando a execução de um teste.")
             return
+        
         st.write(f"### Análise para: {last_result['name']}")
+        
+        # Valida se os dados são válidos
+        readings = np.array(last_result.get('readings', []))
+        if readings.size > 0:
+            signal_std = np.std(readings)
+            if signal_std < 0.1:
+                st.warning("⚠️ Sinal muito plano detectado. Pode indicar que o controle está desconectado ou os dados são inválidos.")
+        
         features = extract_features(last_result)
         is_anomalous = st.session_state.analyzer.predict_is_anomalous(features)
         if is_anomalous:
             st.error("🚨 ALERTA: Anomalia detectada no padrão de movimento!", icon="🚨")
         else:
             st.success("✅ Padrão de movimento dentro da normalidade.", icon="✅")
-        if "Repouso" in last_result['name'] or "Tremor" in last_result['name']:
+        if "Repouso" in last_result['name']:
             fig = plot_test_results(time_axis=last_result['timestamps'], sensor_data=last_result['readings'], fft_results=last_result['fft_results'], test_name=last_result['name'])
             plot_col, _ = st.columns([0.7, 0.3])
             with plot_col:
                 st.pyplot(fig)
-        elif "Tapping" in last_result['name']:
-            col1, col2, col3 = st.columns(3)
-            with col1: st.metric("Total de Cliques", f"{features['tap_count']} cliques")
-            with col2: st.metric("Frequência Média", f"{features['tap_freq']:.2f} cliques/s")
-            with col3: st.metric("Índice de Irregularidade (DP)", f"{features['tap_interval_std']:.4f} s")
 
     def _run_test_logic(self, test: MovementTest):
         result_data = None
         with st.spinner(f"Executando '{test.name}'..."):
-            if "Repouso" in test.name or "Tremor" in test.name:
+            if "Repouso" in test.name:
                 timestamps, readings = [], []
                 start_time = time.time()
+                disconnected = False
+                
                 while time.time() - start_time < test.duration_seconds:
                     try:
                         readings.append(st.session_state.controller.get_sensors_data()['accel_x'])
                         timestamps.append(time.time() - start_time)
-                    except TimeoutError: continue
+                    except TimeoutError:
+                        continue
+                    except Exception as e:
+                        # Se qualquer outra exceção, controle foi desconectado
+                        disconnected = True
+                        break
                     time.sleep(0.01)
+                
+                if disconnected:
+                    st.error("❌ Controle foi desconectado durante o teste!")
+                    st.session_state.controller = None
+                    return
+                
                 if readings:
                     analyzer = SignalAnalyzer()
                     sample_rate = len(readings) / test.duration_seconds
                     fft_results = analyzer.find_tremor_frequency(readings, sample_rate)
                     result_data = {"name": test.name, "timestamps": timestamps, "readings": readings, "fft_results": fft_results, "sample_rate": sample_rate}
-            elif "Tapping" in test.name:
-                st.session_state.controller.start_tapping_test()
-                time.sleep(test.duration_seconds)
-                readings = st.session_state.controller.get_tapping_results()
-                result_data = {"name": test.name, "readings": readings, "duration": test.duration_seconds}
         st.session_state.last_test_result = result_data
 
 if __name__ == "__main__":

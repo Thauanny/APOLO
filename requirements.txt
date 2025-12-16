@@ -1,5 +1,6 @@
 # Para conectar e ler os Joy-Cons/Pro Controller
 pydualsense
+hidapi
 streamlit
 # Para cálculos numéricos e análise de sinal (FFT)
 numpy

@@ -30,12 +30,11 @@ SessionProcessor (janelas deslizantes de 2 seg, 50% overlap)
     ↓
 FeatureExtractor (FFT + estatísticas)
     ↓
-7 Features por janela:
+4 Features por teste:
     ├─ peak_freq: frequência dominante (Hz)
     ├─ tremor_power: energia na faixa 4-8 Hz
     ├─ total_power: energia total
-    ├─ tremor_index: proporção de tremor
-    └─ (+ 3 features de tapping se aplicável)
+    └─ tremor_index: proporção de tremor
 
 Resultado: ~1927 linhas de features (cada 2 seg = 1 feature vector)
 ```
@@ -283,15 +282,16 @@ Ação: Usar K-Distance graph para encontrar melhor eps
 ## 📂 Arquivos Principais do Projeto
 
 ```
+config.py                          ← Configuração centralizada (DBSCAN, tremor, etc.)
 gravacao_jogo_dados_controle.py    ← Gera gameplay_session.csv
 treinar_modelo_local.py            ← Treina analyzer_model.joblib
 main.py                            ← Lança a interface Streamlit
 
 src/analysis/
     ├─ signal_analyzer.py          ← FFT (coração da análise)
-    ├─ feature_extractor.py        ← 7 features por janela
+    ├─ feature_extractor.py        ← 4 features por teste
     ├─ session_processor.py        ← Divide em janelas
-    └─ cluster_analyzer.py         ← DBSCAN + redução dimensional
+    └─ cluster_analyzer.py         ← DBSCAN + redução dimensional (Singleton)
 
 src/app/
     └─ streamlit_ui.py             ← Interface web

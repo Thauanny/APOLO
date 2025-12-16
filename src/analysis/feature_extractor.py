@@ -12,6 +12,12 @@ def _extract_features_from_rest_test(test_result: Dict) -> Dict:
     if sensor_readings.size == 0 or sample_rate <= 0:
         return {"peak_freq": 0, "tremor_power": 0, "total_power": 0, "tremor_index": 0}
 
+    # Verifica se sinal é válido (tem variação mínima)
+    signal_std = np.std(sensor_readings)
+    if signal_std < 0.1:  # Sinal muito plano, retorna valores neutros
+        print(f"⚠️ AVISO: Sinal muito plano (std={signal_std:.4f}). Pode indicar dados inválidos ou controle desconectado.")
+        return {"peak_freq": 0, "tremor_power": 0, "total_power": 0, "tremor_index": 0}
+
     analyzer = SignalAnalyzer()
     fft_x, yf, dominant_freq, _ = analyzer.find_tremor_frequency(sensor_readings, sample_rate)
     
