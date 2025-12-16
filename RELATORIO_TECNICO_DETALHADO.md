@@ -4,6 +4,7 @@
 **Data:** 15 de dezembro de 2025  
 **Autor:** Thauanny Kyssy Ramos Pereira  
 **Versão:** 1.0
+**Arquivos, datasets, scripts, readme**: 
 
 ---
 
